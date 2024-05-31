@@ -8,7 +8,6 @@ import android.bluetooth.le.AdvertiseData
 import android.bluetooth.le.AdvertiseSettings
 import android.content.Context
 import android.content.pm.PackageManager
-import android.os.ParcelUuid
 import android.util.Log
 import androidx.core.app.ActivityCompat
 import com.erns.androidbeacon.beaconTransmiter.tools.BleTools
@@ -26,64 +25,82 @@ class DefaultBeaconTransmitter private constructor(
         @Volatile
         private var INSTANCE: DefaultBeaconTransmitter? = null
 
+        // Método para obtener una instancia única de DefaultBeaconTransmitter
         fun getInstance(context: Context, config: BeaconConfig): DefaultBeaconTransmitter =
             INSTANCE ?: synchronized(this) {
                 INSTANCE ?: DefaultBeaconTransmitter(context, config).also { INSTANCE = it }
             }
     }
 
-    private val bluetoothAdapter: BluetoothAdapter? by lazy {
-        val bluetoothManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
-        bluetoothManager.adapter
-    }
+    // Adaptador Bluetooth del dispositivo
+    private val bluetoothAdapter: BluetoothAdapter? = (context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager).adapter
 
+    // Variable para rastrear si se está transmitiendo publicidad
     private var isAdvertising = false
 
     override fun startAdvertising() {
+        // Verificar si el Bluetooth LE es compatible y si se otorgaron permisos
         if (!isBluetoothLeSupported() || !hasBluetoothPermission()) {
             Log.e(TAG, "Bluetooth LE not supported or permission denied.")
             return
         }
 
+        // Verificar el permiso BLUETOOTH_ADVERTISE
         if (ActivityCompat.checkSelfPermission(
                 context,
                 Manifest.permission.BLUETOOTH_ADVERTISE
             ) != PackageManager.PERMISSION_GRANTED
         ) {
-            Log.e(TAG, "BLUETOOTH_CONNECT denied!")
+            Log.e(TAG, "BLUETOOTH_ADVERTISE permission denied!")
             return
         }
 
+        // Construir los datos y ajustes de la publicidad
         val data = buildAdvertiseData(config)
         val settings = buildAdvertiseSettings()
 
-        bluetoothAdapter?.bluetoothLeAdvertiser?.apply {
-            stopAdvertising(advertisingCallback)
-            startAdvertising(settings, data, advertisingCallback)
+        // Obtener el BluetoothLeAdvertiser
+        val bluetoothLeAdvertiser = bluetoothAdapter?.bluetoothLeAdvertiser
+
+        // Verificar si el BluetoothLeAdvertiser no es nulo
+        if (bluetoothLeAdvertiser != null) {
+            // Detener cualquier publicidad en curso
+            bluetoothLeAdvertiser.stopAdvertising(advertisingCallback)
+
+            // Comenzar una nueva publicidad
+            bluetoothLeAdvertiser.startAdvertising(settings, data, advertisingCallback)
+
+            // Marcar el estado de la publicidad como activa
             isAdvertising = true
+        } else {
+            Log.e(TAG, "Bluetooth LE Advertiser is null.")
         }
     }
 
     override fun stopAdvertising() {
+        // Verificar el permiso BLUETOOTH_ADVERTISE
         if (ActivityCompat.checkSelfPermission(
                 context,
                 Manifest.permission.BLUETOOTH_ADVERTISE
             ) != PackageManager.PERMISSION_GRANTED
         ) {
-            Log.e(TAG, "BLUETOOTH_CONNECT denied!")
+            Log.e(TAG, "BLUETOOTH_ADVERTISE permission denied!")
             return
         }
 
+        // Detener la publicidad si está en curso
         if (isAdvertising) {
             bluetoothAdapter?.bluetoothLeAdvertiser?.stopAdvertising(advertisingCallback)
             isAdvertising = false
         }
     }
 
+    // Verificar si el Bluetooth LE es compatible en el dispositivo
     private fun isBluetoothLeSupported(): Boolean {
         return context.packageManager.hasSystemFeature(PackageManager.FEATURE_BLUETOOTH_LE)
     }
 
+    // Verificar si se otorgó el permiso para publicitar Bluetooth
     private fun hasBluetoothPermission(): Boolean {
         return ActivityCompat.checkSelfPermission(
             context,
@@ -91,11 +108,11 @@ class DefaultBeaconTransmitter private constructor(
         ) == PackageManager.PERMISSION_GRANTED
     }
 
+    // Construir los datos de la publicidad
     private fun buildAdvertiseData(config: BeaconConfig): AdvertiseData {
         val dataBuilder = AdvertiseData.Builder()
         val manufacturerData = ByteBuffer.allocate(23)
 
-//        val serviceUuid = ParcelUuid.fromString(config.uuid)
         val uuidBytes: ByteArray = BleTools.getIdAsByte(config.uuid)
 
         manufacturerData.put(0, 0x02.toByte()) // Beacon Identifier
@@ -111,7 +128,7 @@ class DefaultBeaconTransmitter private constructor(
 
         dataBuilder.addManufacturerData(MANUFACTURER_ID, manufacturerData.array())
 
-        // Add the name if it's set
+        // Agregar el nombre del dispositivo si está configurado en la configuración
         config.name?.let {
             dataBuilder.setIncludeDeviceName(true)
             bluetoothAdapter?.name = it
@@ -120,6 +137,7 @@ class DefaultBeaconTransmitter private constructor(
         return dataBuilder.build()
     }
 
+    // Construir los ajustes para la publicidad
     private fun buildAdvertiseSettings(): AdvertiseSettings {
         return AdvertiseSettings.Builder()
             .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_POWER)
@@ -129,36 +147,25 @@ class DefaultBeaconTransmitter private constructor(
             .build()
     }
 
+    // Callback para manejar eventos de inicio y detención de publicidad
     private val advertisingCallback = object : AdvertiseCallback() {
         override fun onStartSuccess(settingsInEffect: AdvertiseSettings?) {
             super.onStartSuccess(settingsInEffect)
             Log.d(TAG, "Advertising successfully started")
         }
 
-
         override fun onStartFailure(errorCode: Int) {
             super.onStartFailure(errorCode)
-
-            Log.d(TAG, "Advertising failed, errorCode: $errorCode")
+            Log.e(TAG, "Advertising failed, errorCode: $errorCode")
 
             when (errorCode) {
-                ADVERTISE_FAILED_ALREADY_STARTED -> Log.d(TAG, "ADVERTISE_FAILED_ALREADY_STARTED")
-                ADVERTISE_FAILED_DATA_TOO_LARGE -> Log.d(TAG, "ADVERTISE_FAILED_DATA_TOO_LARGE")
-                ADVERTISE_FAILED_FEATURE_UNSUPPORTED -> Log.d(
-                    TAG,
-                    "ADVERTISE_FAILED_FEATURE_UNSUPPORTED"
-                )
-
-                ADVERTISE_FAILED_INTERNAL_ERROR -> Log.d(TAG, "ADVERTISE_FAILED_INTERNAL_ERROR")
-                ADVERTISE_FAILED_TOO_MANY_ADVERTISERS -> Log.d(
-                    TAG,
-                    "ADVERTISE_FAILED_TOO_MANY_ADVERTISERS"
-                )
-
-                else -> Log.d(TAG, "Unhandled error: $errorCode")
+                ADVERTISE_FAILED_ALREADY_STARTED -> Log.e(TAG, "ADVERTISE_FAILED_ALREADY_STARTED")
+                ADVERTISE_FAILED_DATA_TOO_LARGE -> Log.e(TAG, "ADVERTISE_FAILED_DATA_TOO_LARGE")
+                ADVERTISE_FAILED_FEATURE_UNSUPPORTED -> Log.e(TAG, "ADVERTISE_FAILED_FEATURE_UNSUPPORTED")
+                ADVERTISE_FAILED_INTERNAL_ERROR -> Log.e(TAG, "ADVERTISE_FAILED_INTERNAL_ERROR")
+                ADVERTISE_FAILED_TOO_MANY_ADVERTISERS -> Log.e(TAG, "ADVERTISE_FAILED_TOO_MANY_ADVERTISERS")
+                else -> Log.e(TAG, "Unhandled error: $errorCode")
             }
-//            super.onStartFailure(errorCode)
-//            Log.e(TAG, "Advertising failed, errorCode: $errorCode")
         }
     }
 }
