@@ -30,6 +30,7 @@ class MainActivity : AppCompatActivity() {
             .setMajor(5)
             .setMinor(88)
             .setTxPower(-59)
+            .setName("PAU")
             .build()
 
 

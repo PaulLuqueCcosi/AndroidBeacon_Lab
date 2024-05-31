@@ -111,6 +111,12 @@ class DefaultBeaconTransmitter private constructor(
 
         dataBuilder.addManufacturerData(MANUFACTURER_ID, manufacturerData.array())
 
+        // Add the name if it's set
+        config.name?.let {
+            dataBuilder.setIncludeDeviceName(true)
+            bluetoothAdapter?.name = it
+        }
+
         return dataBuilder.build()
     }
 
@@ -129,9 +135,30 @@ class DefaultBeaconTransmitter private constructor(
             Log.d(TAG, "Advertising successfully started")
         }
 
+
         override fun onStartFailure(errorCode: Int) {
             super.onStartFailure(errorCode)
-            Log.e(TAG, "Advertising failed, errorCode: $errorCode")
+
+            Log.d(TAG, "Advertising failed, errorCode: $errorCode")
+
+            when (errorCode) {
+                ADVERTISE_FAILED_ALREADY_STARTED -> Log.d(TAG, "ADVERTISE_FAILED_ALREADY_STARTED")
+                ADVERTISE_FAILED_DATA_TOO_LARGE -> Log.d(TAG, "ADVERTISE_FAILED_DATA_TOO_LARGE")
+                ADVERTISE_FAILED_FEATURE_UNSUPPORTED -> Log.d(
+                    TAG,
+                    "ADVERTISE_FAILED_FEATURE_UNSUPPORTED"
+                )
+
+                ADVERTISE_FAILED_INTERNAL_ERROR -> Log.d(TAG, "ADVERTISE_FAILED_INTERNAL_ERROR")
+                ADVERTISE_FAILED_TOO_MANY_ADVERTISERS -> Log.d(
+                    TAG,
+                    "ADVERTISE_FAILED_TOO_MANY_ADVERTISERS"
+                )
+
+                else -> Log.d(TAG, "Unhandled error: $errorCode")
+            }
+//            super.onStartFailure(errorCode)
+//            Log.e(TAG, "Advertising failed, errorCode: $errorCode")
         }
     }
 }
