@@ -10,6 +10,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import com.erns.androidbeacon.beaconTransmiter.BeaconConfigBuilder
+import com.erns.androidbeacon.beaconTransmiter.DefaultBeaconTransmitter
 
 class MainActivity : AppCompatActivity() {
     private val TAG = "MainActivity"
@@ -23,10 +25,23 @@ class MainActivity : AppCompatActivity() {
             insets
         }
 
+        val beaconConfig = BeaconConfigBuilder()
+            .setUuid("6ef0e30d73084458b62ef706c692ca77")
+            .setMajor(5)
+            .setMinor(88)
+            .setTxPower(-59)
+            .setName("PA")
+            .build()
+
+
+
         val btnStartTransmitter: Button = findViewById(R.id.btnStartTransmitter)
         btnStartTransmitter.setOnClickListener {
-            val transmitter = Transmitter(applicationContext)
-            transmitter.startAdvertiser()
+
+//            val transmitter = Transmitter(applicationContext)
+//            transmitter.startAdvertiser()
+            val beaconTransmitter = DefaultBeaconTransmitter.getInstance(this, beaconConfig)
+            beaconTransmitter.startAdvertising()
         }
 
         val permissions = arrayOf(
